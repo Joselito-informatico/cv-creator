@@ -1,7 +1,7 @@
 "use client";
 import Editor from '@monaco-editor/react';
-import { useResumeStore } from '../../store/useResumeStore';
-import { resumeSchema } from '../../../domain/schemas/resume.schema';
+import { useResumeStore } from '@/presentation/store/useResumeStore';
+import { resumeSchema } from '@/domain/schemas/resume.schema';
 
 export const CodeEditor = () => {
   const { currentResume, saveCurrent } = useResumeStore();
@@ -10,13 +10,12 @@ export const CodeEditor = () => {
     if (!value) return;
     try {
       const parsed = JSON.parse(value);
-      // El Dominio manda: si no cumple el esquema, no se persiste
       const result = resumeSchema.safeParse(parsed);
       if (result.success) {
         saveCurrent(parsed);
       }
     } catch (e) {
-      // Error de sintaxis JSON - Ignorado para no romper la UX mientras escribe
+        // Ignoramos errores de sintaxis mientras se escribe
     }
   };
 

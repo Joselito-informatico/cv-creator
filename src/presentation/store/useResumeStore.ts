@@ -1,22 +1,26 @@
 import { create } from "zustand";
-import { ResumeProps, resumeSchema } from "../../domain/schemas/resume.schema";
-import { DexieResumeRepository } from "../../infrastructure/persistence/DexieResumeRepository";
-import { SaveResume } from "../../application/use-cases/SaveResume";
-import { ListResumes } from "../../application/use-cases/ListResumes";
+import { ResumeProps, resumeSchema } from "@/domain/schemas/resume.schema";
+import { DexieResumeRepository } from "@/infrastructure/persistence/DexieResumeRepository";
+import { SaveResume } from "@/application/use-cases/SaveResume";
+import { ListResumes } from "@/application/use-cases/ListResumes";
 
 const repository = new DexieResumeRepository();
 const saveUseCase = new SaveResume(repository);
 const listUseCase = new ListResumes(repository);
+
+type ExperienceItem = ResumeProps['experience'][number];
 
 interface ResumeState {
   currentResume: ResumeProps | null;
   allResumes: ResumeProps[];
   isLoading: boolean;
   editMode: 'gui' | 'code';
+  
   setEditMode: (mode: 'gui' | 'code') => void;
   loadAll: () => Promise<void>;
+  setCurrentResume: (resume: ResumeProps) => void;
   updateBasics: (data: Partial<ResumeProps['basics']>) => Promise<void>;
-  updateExperience: (index: number, data: any) => Promise<void>;
+  updateExperience: (index: number, data: Partial<ExperienceItem>) => Promise<void>;
   addExperience: () => Promise<void>;
   updateCustomHtml: (html: string) => Promise<void>;
   saveCurrent: (data: unknown) => Promise<void>;
@@ -32,30 +36,50 @@ export const useResumeStore = create<ResumeState>((set, get) => ({
 
   loadAll: async () => {
     set({ isLoading: true });
-    const resumes = await listUseCase.execute();
-    set({ allResumes: resumes, isLoading: false });
-    if (resumes.length > 0 && !get().currentResume) set({ currentResume: resumes[0] });
+    try {
+      const resumes = await listUseCase.execute();
+      set({ allResumes: resumes, isLoading: false });
+      if (resumes.length > 0 && !get().currentResume) {
+        set({ currentResume: resumes[0] });
+      }
+    } catch (error) {
+      set({ isLoading: false });
+      console.error("Error al cargar datos:", error);
+    }
   },
+
+  setCurrentResume: (resume) => set({ currentResume: resume }),
 
   updateBasics: async (newData) => {
     const { currentResume } = get();
     if (!currentResume) return;
-    const updated = { ...currentResume, basics: { ...currentResume.basics, ...newData }, updatedAt: new Date() };
-    await get().saveCurrent(updated);
+
+    const updatedData = {
+      ...currentResume,
+      basics: { ...currentResume.basics, ...newData },
+      updatedAt: new Date()
+    };
+    await get().saveCurrent(updatedData);
   },
 
   updateExperience: async (index, data) => {
     const { currentResume } = get();
     if (!currentResume) return;
     const exp = [...currentResume.experience];
-    exp[index] = { ...exp[index], ...data };
-    await get().saveCurrent({ ...currentResume, experience: exp, updatedAt: new Date() });
+    if (exp[index]) {
+        exp[index] = { ...exp[index], ...data };
+        const updated = { ...currentResume, experience: exp, updatedAt: new Date() };
+        await get().saveCurrent(updated);
+    }
   },
 
   addExperience: async () => {
     const { currentResume } = get();
     if (!currentResume) return;
-    const exp = [...currentResume.experience, { company: "Nueva Empresa", position: "Cargo", period: "2024 - Actualidad", description: "" }];
+    const newRole: ExperienceItem = {
+        company: "Nueva Empresa", position: "Cargo", period: "2024 - Presente", description: "" 
+    };
+    const exp = [...currentResume.experience, newRole];
     await get().saveCurrent({ ...currentResume, experience: exp, updatedAt: new Date() });
   },
 
@@ -70,8 +94,12 @@ export const useResumeStore = create<ResumeState>((set, get) => ({
       const result = resumeSchema.safeParse(data);
       if (result.success) {
         await saveUseCase.execute(result.data);
-        set({ currentResume: result.data });
+        const resumes = await listUseCase.execute();
+        const saved = resumes.find(r => r.id === result.data.id) || result.data;
+        set({ currentResume: saved, allResumes: resumes, isLoading: false });
       }
-    } catch (e) { console.error("Error saving:", e); }
+    } catch (e) {
+      console.error("Error de persistencia:", e);
+    }
   }
 }));

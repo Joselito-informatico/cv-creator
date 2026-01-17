@@ -1,4 +1,4 @@
-import { ResumeProps } from "../schemas/resume.schema";
+import { ResumeProps } from "@/domain/schemas/resume.schema";
 
 export interface IResumeRepository {
   save(resume: ResumeProps): Promise<void>;

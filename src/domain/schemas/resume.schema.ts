@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const resumeSchema = z.object({
-  id: z.string().uuid(), 
+  id: z.string().uuid(),
   basics: z.object({
     name: z.string().min(2, "Mínimo 2 caracteres"),
     email: z.string().email("Email inválido"),
@@ -9,7 +9,6 @@ export const resumeSchema = z.object({
     summary: z.string().optional().default(""),
     phone: z.string().optional().default(""),
   }),
-  // El .default([]) es vital para registros antiguos
   experience: z.array(z.object({
     company: z.string(),
     position: z.string(),

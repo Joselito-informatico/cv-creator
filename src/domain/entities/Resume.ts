@@ -1,27 +1,41 @@
-import { resumeSchema, type ResumeProps } from "../schemas/resume.schema";
+import { resumeSchema, type ResumeProps } from "@/domain/schemas/resume.schema";
 
 export class Resume {
   private constructor(private props: ResumeProps) {}
 
-  static create(data: any): Resume {
-    // 1. Inyectamos estructura básica para objetos huérfanos o viejos
-    const rawData = {
-      ...data,
-      id: data.id || crypto.randomUUID(),
+  // Uso de 'unknown' para obligar a la validación de tipos segura
+  static create(data: unknown): Resume {
+    const raw = data as Record<string, unknown>;
+    const safeRaw = raw || {};
+
+    // Casteo seguro de sub-propiedades para inyección de defaults
+    const basics = (safeRaw.basics as Record<string, unknown>) || {};
+    const experience = Array.isArray(safeRaw.experience) ? safeRaw.experience : [];
+
+    const enrichedData = {
+      ...safeRaw,
+      id: safeRaw.id || crypto.randomUUID(),
       basics: {
-        name: data.basics?.name || "Nuevo Usuario",
-        email: data.basics?.email || "email@ejemplo.com",
-        label: data.basics?.label || "",
-        summary: data.basics?.summary || "",
+        name: basics.name || "Nuevo Usuario",
+        email: basics.email || "email@ejemplo.com",
+        label: basics.label || "",
+        summary: basics.summary || "",
+        phone: basics.phone || "",
+        ...basics
       },
-      experience: Array.isArray(data.experience) ? data.experience : [],
-      customHtml: data.customHtml || "",
-      updatedAt: data.updatedAt || new Date(),
+      experience: experience,
+      customHtml: safeRaw.customHtml || "",
+      updatedAt: safeRaw.updatedAt || new Date(),
     };
 
-    // 2. Validamos y aplicamos defaults del schema
-    const validated = resumeSchema.parse(rawData);
+    const validated = resumeSchema.parse(enrichedData);
     return new Resume(validated);
+  }
+
+  public canBeExported(): boolean {
+    return (
+      this.props.basics.name.length > 0
+    );
   }
 
   public toPersistence(): ResumeProps {
@@ -32,4 +46,5 @@ export class Resume {
   get basics() { return this.props.basics; }
   get experience() { return this.props.experience; }
   get customHtml() { return this.props.customHtml; }
+  get updatedAt() { return this.props.updatedAt; }
 }
